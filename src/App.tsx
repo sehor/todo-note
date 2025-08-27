@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { Toaster } from 'sonner'
 import { useAuth } from './hooks/useAuth'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
@@ -24,8 +25,9 @@ function App() {
   }
 
   return (
-    <Router basename="/todo-note">
-      <Routes>
+    <>
+      <Router basename="/todo-note">
+        <Routes>
         {/* 登录页面 */}
         <Route 
           path="/login" 
@@ -50,10 +52,21 @@ function App() {
           } 
         />
         
-        {/* 默认重定向 */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Router>
+          {/* 默认重定向 */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+      <Toaster 
+        position="top-right" 
+        richColors 
+        closeButton 
+        toastOptions={{
+          style: {
+            zIndex: 9999
+          }
+        }}
+      />
+    </>
   )
 }
 

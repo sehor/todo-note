@@ -23,6 +23,7 @@ export default function Home() {
   const [newTodo, setNewTodo] = useState({ title: '', description: '', start_date: '', due_date: '' })
   const [newTodoAttributes, setNewTodoAttributes] = useState<TodoAttribute[]>([])
   const [showAttributesModal, setShowAttributesModal] = useState(false)
+  const [attributesRefreshTrigger, setAttributesRefreshTrigger] = useState(0)
 
   /**
    * 获取Todo列表
@@ -104,6 +105,14 @@ export default function Home() {
   }
 
   /**
+   * 将ISO格式日期转换为HTML date输入框所需的yyyy-MM-dd格式
+   */
+  const formatDateForInput = (isoDate: string | null): string => {
+    if (!isoDate) return ''
+    return isoDate.split('T')[0]
+  }
+
+  /**
    * 开始编辑Todo
    */
   const startEdit = (todo: TodoWithAttributes) => {
@@ -111,8 +120,8 @@ export default function Home() {
     setEditTodo({
       title: todo.title,
       description: todo.description || '',
-      start_date: todo.start_date || '',
-      due_date: todo.due_date || ''
+      start_date: formatDateForInput(todo.start_date),
+      due_date: formatDateForInput(todo.due_date)
     })
     setEditAttributes(todo.attributes || [])
   }
@@ -296,12 +305,6 @@ export default function Home() {
                 >
                   笔记
                 </Link>
-                <button
-                  onClick={() => setShowAttributesModal(true)}
-                  className="text-gray-600 hover:text-gray-900 font-medium"
-                >
-                  管理属性
-                </button>
               </div>
             </div>
             
@@ -386,6 +389,8 @@ export default function Home() {
                           <AttributeSelector
                             selectedAttributes={editAttributes}
                             onAttributesChange={setEditAttributes}
+                            onManageAttributes={() => setShowAttributesModal(true)}
+                            refreshTrigger={attributesRefreshTrigger}
                           />
                         </div>
                         <div className="flex justify-end space-x-2">
@@ -405,69 +410,86 @@ export default function Home() {
                       </div>
                     ) : (
                       // 显示模式
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start space-x-3 flex-1">
-                          <button
-                            onClick={() => toggleComplete(todo.id, todo.completed)}
-                            className={`mt-1 h-5 w-5 rounded border-2 flex items-center justify-center transition-colors ${
-                              todo.completed
-                                ? 'bg-green-500 border-green-500 text-white'
-                                : 'border-gray-300 hover:border-green-500'
-                            }`}
-                          >
-                            {todo.completed && <Check className="h-3 w-3" />}
-                          </button>
-                          
-                          <div className="flex-1">
-                            <h3 className={`font-medium ${
-                              todo.completed ? 'text-gray-500 line-through' : 'text-gray-900'
-                            }`}>
-                              {todo.title}
-                            </h3>
-                            
-                            {todo.description && (
-                              <p className={`text-sm mt-1 ${
-                                todo.completed ? 'text-gray-400' : 'text-gray-600'
+                      <div className="relative h-32 w-full">
+                        {/* 右上方：时间信息 */}
+                        <div className="absolute top-0 right-0 text-xs text-gray-500 space-y-1">
+                          {todo.start_date && (
+                            <div className="flex items-center space-x-1 justify-end">
+                              <Calendar className="h-3 w-3" />
+                              <span>开始: {new Date(todo.start_date).toLocaleDateString()}</span>
+                            </div>
+                          )}
+                          {/* 只有未完成的todo才显示剩余时间 */}
+                          {todo.due_date && !todo.completed && (
+                            <div className="flex items-center space-x-1 justify-end">
+                              <Clock className="h-3 w-3" />
+                              <span className={`${
+                                calculateTimeRemaining(todo.due_date).includes('已逾期') 
+                                  ? 'text-red-500' 
+                                  : 'text-gray-500'
                               }`}>
-                                {todo.description}
-                              </p>
-                            )}
-                            
-                            {/* 属性标签 */}
-                            {todo.attributes && todo.attributes.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-2">
-                                {todo.attributes.map((attr) => (
-                                  <AttributeTag key={attr.id} attribute={attr} />
-                                ))}
-                              </div>
-                            )}
-                            
-                            {/* 时间信息 */}
-                            <div className="flex flex-wrap gap-4 mt-2 text-xs text-gray-500">
-                              {todo.start_date && (
-                                <div className="flex items-center space-x-1">
-                                  <Calendar className="h-3 w-3" />
-                                  <span>开始: {new Date(todo.start_date).toLocaleDateString()}</span>
-                                </div>
-                              )}
-                              {todo.due_date && (
-                                <div className="flex items-center space-x-1">
-                                  <Clock className="h-3 w-3" />
-                                  <span className={`${
-                                    calculateTimeRemaining(todo.due_date).includes('已逾期') 
-                                      ? 'text-red-500' 
-                                      : 'text-gray-500'
-                                  }`}>
-                                    {calculateTimeRemaining(todo.due_date)}
-                                  </span>
+                                {calculateTimeRemaining(todo.due_date)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 左侧：内容 */}
+                        <div className="h-full pr-24 pb-8">
+                          <div className="flex-1 min-w-0">
+                            {/* 标题和属性在同一行 */}
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className={`font-medium truncate flex-shrink-0 ${
+                                todo.completed ? 'text-gray-500 line-through' : 'text-gray-900'
+                              }`}>
+                                {/* 已完成的todo在标题前显示勾选图标 */}
+                                {todo.completed && (
+                                  <span className="text-green-500 mr-1">✓</span>
+                                )}
+                                {todo.title}
+                              </h3>
+                              {/* 属性标签紧贴标题 */}
+                              {todo.attributes && todo.attributes.length > 0 && (
+                                <div className="flex flex-wrap gap-1 flex-shrink min-w-0">
+                                  {todo.attributes.map((attr) => (
+                                    <AttributeTag key={attr.id} attribute={attr} />
+                                  ))}
                                 </div>
                               )}
                             </div>
+                            
+                            {/* 描述 */}
+                             {todo.description && (
+                               <p className={`text-sm overflow-hidden ${
+                                 todo.completed ? 'text-gray-400' : 'text-gray-600'
+                               }`}
+                               style={{
+                                 display: '-webkit-box',
+                                 WebkitLineClamp: 2,
+                                 WebkitBoxOrient: 'vertical'
+                               }}>
+                                 {todo.description}
+                               </p>
+                             )}
                           </div>
                         </div>
-                        
-                        {/* 操作按钮 */}
-                        <div className="flex items-center space-x-2 ml-4">
+
+                        {/* 右下方：开关和操作按钮 */}
+                        <div className="absolute bottom-0 right-0 flex items-center space-x-3">
+                          {/* 完成状态开关 */}
+                          <button
+                            onClick={() => toggleComplete(todo.id, todo.completed)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                              todo.completed ? 'bg-green-500' : 'bg-gray-200'
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                todo.completed ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                          
                           <button
                             onClick={() => startEdit(todo)}
                             className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
@@ -541,6 +563,8 @@ export default function Home() {
                   <AttributeSelector
                     selectedAttributes={newTodoAttributes}
                     onAttributesChange={setNewTodoAttributes}
+                    onManageAttributes={() => setShowAttributesModal(true)}
+                    refreshTrigger={attributesRefreshTrigger}
                   />
                 </div>
                 <div className="flex justify-end space-x-2">
@@ -570,7 +594,10 @@ export default function Home() {
       {/* 属性管理弹窗 */}
       <AttributesModal 
         isOpen={showAttributesModal}
-        onClose={() => setShowAttributesModal(false)}
+        onClose={() => {
+          setShowAttributesModal(false)
+          setAttributesRefreshTrigger(prev => prev + 1)
+        }}
       />
     </div>
   )

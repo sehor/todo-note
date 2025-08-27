@@ -111,6 +111,33 @@ export const AttributesModal: React.FC<AttributesModalProps> = ({ isOpen, onClos
     }
     
     try {
+      // 检查是否有Todo正在使用该属性
+      const { data: assignments, error: checkError } = await supabase
+        .from('todo_attribute_assignments')
+        .select('id')
+        .eq('attribute_id', id)
+        .limit(1)
+      
+      if (checkError) {
+        console.error('检查属性使用情况失败:', checkError)
+        // 根据错误类型提供具体的错误信息
+        if (checkError.code === 'PGRST116') {
+          toast.error('检查属性使用情况失败：表不存在或无权限访问')
+        } else if (checkError.message?.includes('network')) {
+          toast.error('检查属性使用情况失败：网络连接错误，请检查网络连接')
+        } else {
+          toast.error(`检查属性使用情况失败：${checkError.message || '未知错误'}`)
+        }
+        return
+      }
+      
+      // 如果有Todo正在使用该属性，阻止删除
+      if (assignments && assignments.length > 0) {
+        toast.error('无法删除该属性，因为有Todo正在使用它。请先移除相关Todo的该属性后再删除。')
+        return
+      }
+      
+      // 如果没有Todo使用该属性，则允许删除
       const { error } = await supabase
         .from('todo_attributes')
         .delete()
@@ -120,9 +147,23 @@ export const AttributesModal: React.FC<AttributesModalProps> = ({ isOpen, onClos
       
       setAttributes(attributes.filter(attr => attr.id !== id))
       toast.success('属性删除成功')
-    } catch (error) {
+    } catch (error: any) {
       console.error('删除属性失败:', error)
-      toast.error('删除属性失败')
+      
+      // 根据错误类型提供具体的错误信息
+      if (error.code === '23503') {
+        toast.error('删除失败：该属性仍被其他数据引用，请先移除相关引用')
+      } else if (error.code === '42501') {
+        toast.error('删除失败：权限不足，请联系管理员')
+      } else if (error.code === 'PGRST116') {
+        toast.error('删除失败：表不存在或无权限访问')
+      } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        toast.error('删除失败：网络连接错误，请检查网络连接后重试')
+      } else if (error.message?.includes('timeout')) {
+        toast.error('删除失败：请求超时，请稍后重试')
+      } else {
+        toast.error(`删除失败：${error.message || '未知错误，请稍后重试'}`)
+      }
     }
   }
 

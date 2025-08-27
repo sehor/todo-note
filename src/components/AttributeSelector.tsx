@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react'
 import { Plus, Check } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
 import { TodoAttribute } from '../types'
 import { AttributeTag } from './AttributeTag'
 import { supabase } from '../lib/supabase'
@@ -9,7 +8,9 @@ import { useAuth } from '../hooks/useAuth'
 interface AttributeSelectorProps {
   selectedAttributes: TodoAttribute[]
   onAttributesChange: (attributes: TodoAttribute[]) => void
+  onManageAttributes?: () => void
   className?: string
+  refreshTrigger?: number
 }
 
 /**
@@ -18,10 +19,11 @@ interface AttributeSelectorProps {
 export const AttributeSelector: React.FC<AttributeSelectorProps> = ({
   selectedAttributes,
   onAttributesChange,
-  className = ''
+  onManageAttributes,
+  className = '',
+  refreshTrigger
 }) => {
   const { user } = useAuth()
-  const navigate = useNavigate()
   const [availableAttributes, setAvailableAttributes] = useState<TodoAttribute[]>([])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -49,7 +51,7 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = ({
 
   useEffect(() => {
     fetchAttributes()
-  }, [user])
+  }, [user, refreshTrigger])
 
   // 切换属性选择状态
   const toggleAttribute = (attribute: TodoAttribute) => {
@@ -137,19 +139,20 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = ({
             </div>
             
             {/* 管理属性链接 */}
-            <div className="border-t border-gray-200 px-3 py-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsDropdownOpen(false)
-                  // 使用React Router进行导航
-                  navigate('/attributes')
-                }}
-                className="text-sm text-blue-600 hover:text-blue-800"
-              >
-                管理属性
-              </button>
-            </div>
+            {onManageAttributes && (
+              <div className="border-t border-gray-200 px-3 py-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDropdownOpen(false)
+                    onManageAttributes()
+                  }}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  管理属性
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
