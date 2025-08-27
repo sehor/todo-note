@@ -1,36 +1,55 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Check, X, Edit2, Trash2, User, LogOut, Home } from 'lucide-react'
+import { Plus, Check, X, Edit2, Trash2, User, LogOut, Home, Filter, Settings } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
-import type { Todo, CreateTodoInput, UpdateTodoInput } from '../types'
+import { AttributeSelector } from '../components/AttributeSelector'
+import { AttributeFilter } from '../components/AttributeFilter'
+import { AttributeTag } from '../components/AttributeTag'
+import type { Todo, CreateTodoInput, UpdateTodoInput, TodoWithAttributes, TodoAttribute, AttributeFilter as AttributeFilterType } from '../types'
 
 /**
  * Todo 管理页面组件
  */
 export default function Todos() {
   const { user, signOut } = useAuth()
-  const [todos, setTodos] = useState<Todo[]>([])
+  const [todos, setTodos] = useState<TodoWithAttributes[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [newTodo, setNewTodo] = useState({ title: '', description: '' })
   const [editTodo, setEditTodo] = useState({ title: '', description: '' })
+  const [newTodoAttributes, setNewTodoAttributes] = useState<string[]>([])
+  const [editTodoAttributes, setEditTodoAttributes] = useState<string[]>([])
+  const [showFilter, setShowFilter] = useState(false)
+  const [attributeFilter, setAttributeFilter] = useState<AttributeFilterType>({ attributeIds: [], operator: 'OR' })
 
   /**
-   * 获取 Todo 列表
+   * 获取 Todo 列表（包含属性信息）
    */
   const fetchTodos = async () => {
     try {
       setLoading(true)
       const { data, error } = await supabase
         .from('todos')
-        .select('*')
+        .select(`
+          *,
+          todo_attribute_assignments(
+            todo_attributes(*)
+          )
+        `)
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false })
       
       if (error) throw error
-      setTodos(data || [])
+      
+      // 转换数据格式
+      const todosWithAttributes: TodoWithAttributes[] = (data || []).map(todo => ({
+        ...todo,
+        attributes: todo.todo_attribute_assignments?.map((assignment: any) => assignment.todo_attributes) || []
+      }))
+      
+      setTodos(todosWithAttributes)
     } catch (error) {
       console.error('获取 Todo 列表失败:', error)
     } finally {
@@ -39,7 +58,7 @@ export default function Todos() {
   }
 
   /**
-   * 创建新 Todo
+   * 创建新 Todo（包含属性分配）
    */
   const createTodo = async () => {
     if (!newTodo.title.trim()) return
@@ -51,13 +70,30 @@ export default function Todos() {
         user_id: user!.id
       }
       
-      const { error } = await supabase
+      const { data: todoResult, error: todoError } = await supabase
         .from('todos')
         .insert([todoData])
+        .select()
+        .single()
       
-      if (error) throw error
+      if (todoError) throw todoError
+      
+      // 分配属性
+      if (newTodoAttributes.length > 0) {
+        const assignments = newTodoAttributes.map(attributeId => ({
+          todo_id: todoResult.id,
+          attribute_id: attributeId
+        }))
+        
+        const { error: assignmentError } = await supabase
+          .from('todo_attribute_assignments')
+          .insert(assignments)
+        
+        if (assignmentError) throw assignmentError
+      }
       
       setNewTodo({ title: '', description: '' })
+      setNewTodoAttributes([])
       setCreating(false)
       fetchTodos()
     } catch (error) {
@@ -111,24 +147,54 @@ export default function Todos() {
   /**
    * 开始编辑
    */
-  const startEdit = (todo: Todo) => {
+  const startEdit = (todo: TodoWithAttributes) => {
     setEditingId(todo.id)
     setEditTodo({ title: todo.title, description: todo.description || '' })
+    setEditTodoAttributes(todo.attributes?.map(attr => attr.id) || [])
   }
 
   /**
-   * 保存编辑
+   * 保存编辑（包含属性更新）
    */
   const saveEdit = async () => {
     if (!editTodo.title.trim() || !editingId) return
     
-    await updateTodo(editingId, {
-      title: editTodo.title.trim(),
-      description: editTodo.description.trim() || null
-    })
-    
-    setEditingId(null)
-    setEditTodo({ title: '', description: '' })
+    try {
+      // 更新todo基本信息
+      await updateTodo(editingId, {
+        title: editTodo.title.trim(),
+        description: editTodo.description.trim() || null
+      })
+      
+      // 删除现有属性分配
+      const { error: deleteError } = await supabase
+        .from('todo_attribute_assignments')
+        .delete()
+        .eq('todo_id', editingId)
+      
+      if (deleteError) throw deleteError
+      
+      // 添加新的属性分配
+      if (editTodoAttributes.length > 0) {
+        const assignments = editTodoAttributes.map(attributeId => ({
+          todo_id: editingId,
+          attribute_id: attributeId
+        }))
+        
+        const { error: assignmentError } = await supabase
+          .from('todo_attribute_assignments')
+          .insert(assignments)
+        
+        if (assignmentError) throw assignmentError
+      }
+      
+      setEditingId(null)
+      setEditTodo({ title: '', description: '' })
+      setEditTodoAttributes([])
+      fetchTodos()
+    } catch (error) {
+      console.error('保存编辑失败:', error)
+    }
   }
 
   /**
@@ -137,6 +203,7 @@ export default function Todos() {
   const cancelEdit = () => {
     setEditingId(null)
     setEditTodo({ title: '', description: '' })
+    setEditTodoAttributes([])
   }
 
   /**
@@ -184,6 +251,13 @@ export default function Todos() {
                 >
                   笔记
                 </Link>
+                <Link 
+                  to="/attributes" 
+                  className="text-gray-600 hover:text-gray-900 font-medium flex items-center space-x-1"
+                >
+                  <Settings className="h-4 w-4" />
+                  <span>属性管理</span>
+                </Link>
               </div>
             </div>
             
@@ -211,14 +285,37 @@ export default function Todos() {
             <h2 className="text-2xl font-bold text-gray-900">待办事项</h2>
             <p className="text-gray-600 mt-1">管理您的任务和目标</p>
           </div>
-          <button
-            onClick={() => setCreating(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            <span>新建待办</span>
-          </button>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setShowFilter(!showFilter)}
+              className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors ${
+                showFilter 
+                  ? 'bg-blue-100 text-blue-700 border border-blue-300' 
+                  : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+              }`}
+            >
+              <Filter className="h-4 w-4" />
+              <span>筛选</span>
+            </button>
+            <button
+              onClick={() => setCreating(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              <span>新建待办</span>
+            </button>
+          </div>
         </div>
+
+        {/* 属性筛选器 */}
+        {showFilter && (
+          <div className="bg-white rounded-lg shadow-sm border p-4 mb-6">
+            <AttributeFilter
+              filter={attributeFilter}
+              onFilterChange={setAttributeFilter}
+            />
+          </div>
+        )}
 
         {/* 创建新 Todo */}
         {creating && (
@@ -248,6 +345,19 @@ export default function Todos() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="输入详细描述（可选）"
                   rows={3}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  属性标签
+                </label>
+                <AttributeSelector
+                  selectedAttributes={newTodoAttributes.map(id => {
+                    // 从已获取的属性中找到对应的完整属性信息
+                    const foundAttr = todos.flatMap(t => t.attributes || []).find(attr => attr.id === id)
+                    return foundAttr || { id, name: '', color: '#3B82F6', user_id: user?.id || '', created_at: '', updated_at: '' }
+                  })}
+                  onAttributesChange={(attrs) => setNewTodoAttributes(attrs.map(attr => attr.id))}
                 />
               </div>
               <div className="flex space-x-3">
@@ -281,22 +391,40 @@ export default function Todos() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
               <p className="text-gray-600 mt-2">加载中...</p>
             </div>
-          ) : todos.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-gray-400 mb-4">
-                <Check className="h-12 w-12 mx-auto" />
+          ) : (() => {
+            // 应用属性筛选
+            const filteredTodos = todos.filter(todo => {
+              if (attributeFilter.attributeIds.length === 0) return true
+              
+              const todoAttributeIds = todo.attributes?.map(attr => attr.id) || []
+              
+              if (attributeFilter.operator === 'AND') {
+                return attributeFilter.attributeIds.every(id => todoAttributeIds.includes(id))
+              } else {
+                return attributeFilter.attributeIds.some(id => todoAttributeIds.includes(id))
+              }
+            })
+            
+            return filteredTodos.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-gray-400 mb-4">
+                  <Check className="h-12 w-12 mx-auto" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {todos.length === 0 ? '还没有待办事项' : '没有符合筛选条件的待办事项'}
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  {todos.length === 0 ? '创建您的第一个待办事项开始管理任务' : '尝试调整筛选条件或创建新的待办事项'}
+                </p>
+                <button
+                  onClick={() => setCreating(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  创建待办事项
+                </button>
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">还没有待办事项</h3>
-              <p className="text-gray-600 mb-4">创建您的第一个待办事项开始管理任务</p>
-              <button
-                onClick={() => setCreating(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                创建待办事项
-              </button>
-            </div>
-          ) : (
-            todos.map((todo) => (
+            ) : (
+              filteredTodos.map((todo) => (
               <div key={todo.id} className="bg-white rounded-lg shadow-sm border p-6">
                 {editingId === todo.id ? (
                   // 编辑模式
@@ -321,6 +449,19 @@ export default function Todos() {
                         onChange={(e) => setEditTodo({ ...editTodo, description: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         rows={3}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        属性标签
+                      </label>
+                      <AttributeSelector
+                        selectedAttributes={editTodoAttributes.map(id => {
+                          // 从已获取的属性中找到对应的完整属性信息
+                          const foundAttr = todos.flatMap(t => t.attributes || []).find(attr => attr.id === id)
+                          return foundAttr || { id, name: '', color: '#3B82F6', user_id: user?.id || '', created_at: '', updated_at: '' }
+                        })}
+                        onAttributesChange={(attrs) => setEditTodoAttributes(attrs.map(attr => attr.id))}
                       />
                     </div>
                     <div className="flex space-x-3">
@@ -368,6 +509,17 @@ export default function Todos() {
                             {todo.description}
                           </p>
                         )}
+                        {todo.attributes && todo.attributes.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {todo.attributes.map(attribute => (
+                              <AttributeTag
+                                key={attribute.id}
+                                attribute={attribute}
+                                size="sm"
+                              />
+                            ))}
+                          </div>
+                        )}
                         <p className="text-xs text-gray-400 mt-2">
                           创建于 {new Date(todo.created_at).toLocaleString('zh-CN')}
                         </p>
@@ -391,7 +543,9 @@ export default function Todos() {
                 )}
               </div>
             ))
-          )}
+            )
+          })()
+        }
         </div>
       </main>
     </div>

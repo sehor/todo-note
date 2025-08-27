@@ -5,6 +5,7 @@ import Login from './pages/Login'
 import Home from './pages/Home'
 import Todos from './pages/Todos'
 import Notes from './pages/Notes'
+import Attributes from './pages/Attributes'
 
 /**
  * 主应用组件，配置路由系统
@@ -25,7 +26,7 @@ function App() {
   }
 
   return (
-    <Router>
+    <Router basename="/todo-note">
       <Routes>
         {/* 登录页面 */}
         <Route 
@@ -55,6 +56,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Notes />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/attributes" 
+          element={
+            <ProtectedRoute>
+              <Attributes />
             </ProtectedRoute>
           } 
         />
