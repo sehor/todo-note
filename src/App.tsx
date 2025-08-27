@@ -3,9 +3,7 @@ import { useAuth } from './hooks/useAuth'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import Home from './pages/Home'
-import Todos from './pages/Todos'
 import Notes from './pages/Notes'
-import Attributes from './pages/Attributes'
 
 /**
  * 主应用组件，配置路由系统
@@ -44,26 +42,10 @@ function App() {
           } 
         />
         <Route 
-          path="/todos" 
-          element={
-            <ProtectedRoute>
-              <Todos />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
           path="/notes" 
           element={
             <ProtectedRoute>
               <Notes />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/attributes" 
-          element={
-            <ProtectedRoute>
-              <Attributes />
             </ProtectedRoute>
           } 
         />

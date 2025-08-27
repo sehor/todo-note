@@ -174,16 +174,11 @@ export default function Notes() {
                   <span>首页</span>
                 </Link>
                 <Link 
-                  to="/todos" 
-                  className="text-gray-600 hover:text-gray-900 font-medium"
-                >
-                  待办事项
-                </Link>
-                <Link 
                   to="/notes" 
-                  className="text-blue-600 hover:text-blue-700 font-medium"
+                  className="text-blue-600 hover:text-blue-700 font-medium flex items-center space-x-1"
                 >
-                  笔记
+                  <FileText className="h-4 w-4" />
+                  <span>笔记</span>
                 </Link>
               </div>
             </div>

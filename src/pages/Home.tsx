@@ -1,29 +1,31 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { CheckSquare, FileText, Plus, User, LogOut, Check, Edit2, Trash2, Clock, Calendar } from 'lucide-react'
+import { CheckSquare, Plus, User, LogOut, Check, Edit2, Trash2, Clock, Calendar } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { AttributeTag } from '../components/AttributeTag'
-import type { Todo, Note, TodoWithAttributes, UpdateTodoInput } from '../types'
+import { AttributeSelector } from '../components/AttributeSelector'
+import { AttributesModal } from '../components/AttributesModal'
+import type { TodoWithAttributes, UpdateTodoInput, TodoAttribute } from '../types'
 
 /**
  * 主页面组件，显示导航和统计概览
  */
 export default function Home() {
   const { user, signOut } = useAuth()
-  const [stats, setStats] = useState({
-    totalTodos: 0,
-    completedTodos: 0,
-    totalNotes: 0
-  })
-  const [loading, setLoading] = useState(true)
+
   const [todos, setTodos] = useState<TodoWithAttributes[]>([])
   const [todosLoading, setTodosLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTodo, setEditTodo] = useState({ title: '', description: '', start_date: '', due_date: '' })
+  const [editAttributes, setEditAttributes] = useState<TodoAttribute[]>([])
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [newTodo, setNewTodo] = useState({ title: '', description: '', start_date: '', due_date: '' })
+  const [newTodoAttributes, setNewTodoAttributes] = useState<TodoAttribute[]>([])
+  const [showAttributesModal, setShowAttributesModal] = useState(false)
 
   /**
-   * 获取Todo列表（限制显示最近10个）
+   * 获取Todo列表
    */
   const fetchTodos = async () => {
     try {
@@ -38,7 +40,6 @@ export default function Home() {
         `)
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false })
-        .limit(10)
       
       if (error) throw error
       
@@ -56,44 +57,7 @@ export default function Home() {
     }
   }
 
-  /**
-   * 获取统计数据
-   */
-  const fetchStats = async () => {
-    try {
-      setLoading(true)
-      
-      // 获取 Todos 统计
-      const { data: todos, error: todosError } = await supabase
-        .from('todos')
-        .select('completed')
-        .eq('user_id', user?.id)
-      
-      if (todosError) throw todosError
-      
-      // 获取 Notes 统计
-      const { data: notes, error: notesError } = await supabase
-        .from('notes')
-        .select('id')
-        .eq('user_id', user?.id)
-      
-      if (notesError) throw notesError
-      
-      const totalTodos = todos?.length || 0
-      const completedTodos = todos?.filter(todo => todo.completed).length || 0
-      const totalNotes = notes?.length || 0
-      
-      setStats({
-        totalTodos,
-        completedTodos,
-        totalNotes
-      })
-    } catch (error) {
-      console.error('获取统计数据失败:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+
 
   /**
    * 切换Todo完成状态
@@ -112,8 +76,7 @@ export default function Home() {
         todo.id === id ? { ...todo, completed: !completed } : todo
       ))
       
-      // 刷新统计数据
-      fetchStats()
+
     } catch (error) {
       console.error('更新Todo状态失败:', error)
     }
@@ -134,8 +97,7 @@ export default function Home() {
       // 更新本地状态
       setTodos(prev => prev.filter(todo => todo.id !== id))
       
-      // 刷新统计数据
-      fetchStats()
+
     } catch (error) {
       console.error('删除Todo失败:', error)
     }
@@ -152,6 +114,7 @@ export default function Home() {
       start_date: todo.start_date || '',
       due_date: todo.due_date || ''
     })
+    setEditAttributes(todo.attributes || [])
   }
 
   /**
@@ -160,6 +123,7 @@ export default function Home() {
   const cancelEdit = () => {
     setEditingId(null)
     setEditTodo({ title: '', description: '', start_date: '', due_date: '' })
+    setEditAttributes([])
   }
 
   /**
@@ -176,21 +140,93 @@ export default function Home() {
         due_date: editTodo.due_date || null
       }
       
-      const { error } = await supabase
+      // 更新todo基本信息
+      const { error: updateError } = await supabase
         .from('todos')
         .update(updateData)
         .eq('id', editingId)
       
-      if (error) throw error
+      if (updateError) throw updateError
       
-      // 更新本地状态
-      setTodos(prev => prev.map(todo => 
-        todo.id === editingId ? { ...todo, ...updateData } : todo
-      ))
+      // 删除旧的属性关联
+      const { error: deleteError } = await supabase
+        .from('todo_attribute_assignments')
+        .delete()
+        .eq('todo_id', editingId)
+      
+      if (deleteError) throw deleteError
+      
+      // 创建新的属性关联
+      if (editAttributes.length > 0) {
+        const assignments = editAttributes.map(attr => ({
+          todo_id: editingId,
+          attribute_id: attr.id
+        }))
+        
+        const { error: insertError } = await supabase
+          .from('todo_attribute_assignments')
+          .insert(assignments)
+        
+        if (insertError) throw insertError
+      }
+      
+      // 重新获取todo列表以更新属性
+      fetchTodos()
       
       cancelEdit()
     } catch (error) {
       console.error('更新Todo失败:', error)
+    }
+  }
+
+  /**
+   * 创建新Todo
+   */
+  const createTodo = async () => {
+    if (!newTodo.title.trim()) return
+    
+    try {
+      const todoData = {
+        title: newTodo.title.trim(),
+        description: newTodo.description.trim() || null,
+        start_date: newTodo.start_date || null,
+        due_date: newTodo.due_date || null,
+        user_id: user?.id,
+        completed: false
+      }
+      
+      // 创建todo并获取返回的id
+      const { data: todoResult, error: todoError } = await supabase
+        .from('todos')
+        .insert([todoData])
+        .select('id')
+        .single()
+      
+      if (todoError) throw todoError
+      
+      // 如果有选择的属性，创建属性关联
+      if (newTodoAttributes.length > 0 && todoResult) {
+        const assignments = newTodoAttributes.map(attr => ({
+          todo_id: todoResult.id,
+          attribute_id: attr.id
+        }))
+        
+        const { error: assignmentError } = await supabase
+          .from('todo_attribute_assignments')
+          .insert(assignments)
+        
+        if (assignmentError) throw assignmentError
+      }
+      
+      // 重新获取todo列表
+      fetchTodos()
+      
+      // 重置表单
+      setNewTodo({ title: '', description: '', start_date: '', due_date: '' })
+      setNewTodoAttributes([])
+      setShowCreateForm(false)
+    } catch (error) {
+      console.error('创建Todo失败:', error)
     }
   }
 
@@ -224,7 +260,6 @@ export default function Home() {
 
   useEffect(() => {
     if (user) {
-      fetchStats()
       fetchTodos()
     }
   }, [user])
@@ -256,17 +291,17 @@ export default function Home() {
                   首页
                 </Link>
                 <Link 
-                  to="/todos" 
-                  className="text-gray-600 hover:text-gray-900 font-medium"
-                >
-                  待办事项
-                </Link>
-                <Link 
                   to="/notes" 
                   className="text-gray-600 hover:text-gray-900 font-medium"
                 >
                   笔记
                 </Link>
+                <button
+                  onClick={() => setShowAttributesModal(true)}
+                  className="text-gray-600 hover:text-gray-900 font-medium"
+                >
+                  管理属性
+                </button>
               </div>
             </div>
             
@@ -289,104 +324,10 @@ export default function Home() {
 
       {/* 主要内容 */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">欢迎回来！</h2>
-          <p className="text-gray-600">管理您的待办事项和笔记</p>
-        </div>
-
-        {/* 统计卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-sm p-6 border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">待办事项</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {loading ? '-' : stats.totalTodos}
-                </p>
-                <p className="text-sm text-gray-500">
-                  已完成 {loading ? '-' : stats.completedTodos} 项
-                </p>
-              </div>
-              <CheckSquare className="h-8 w-8 text-blue-600" />
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow-sm p-6 border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">笔记</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {loading ? '-' : stats.totalNotes}
-                </p>
-                <p className="text-sm text-gray-500">总计</p>
-              </div>
-              <FileText className="h-8 w-8 text-green-600" />
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow-sm p-6 border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">完成率</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {loading ? '-' : stats.totalTodos > 0 ? Math.round((stats.completedTodos / stats.totalTodos) * 100) : 0}%
-                </p>
-                <p className="text-sm text-gray-500">今日进度</p>
-              </div>
-              <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
-                <span className="text-purple-600 font-bold text-sm">
-                  {loading ? '-' : stats.totalTodos > 0 ? Math.round((stats.completedTodos / stats.totalTodos) * 100) : 0}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 快速操作 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <Link 
-            to="/todos"
-            className="bg-white rounded-lg shadow-sm p-6 border hover:shadow-md transition-shadow group"
-          >
-            <div className="flex items-center space-x-4">
-              <div className="bg-blue-100 rounded-lg p-3 group-hover:bg-blue-200 transition-colors">
-                <Plus className="h-6 w-6 text-blue-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">创建待办事项</h3>
-                <p className="text-gray-600">添加新的任务和目标</p>
-              </div>
-            </div>
-          </Link>
-          
-          <Link 
-            to="/notes"
-            className="bg-white rounded-lg shadow-sm p-6 border hover:shadow-md transition-shadow group"
-          >
-            <div className="flex items-center space-x-4">
-              <div className="bg-green-100 rounded-lg p-3 group-hover:bg-green-200 transition-colors">
-                <Plus className="h-6 w-6 text-green-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">创建笔记</h3>
-                <p className="text-gray-600">记录想法和重要信息</p>
-              </div>
-            </div>
-          </Link>
-        </div>
-
-        {/* 最近的待办事项 */}
+        {/* 待办事项列表 */}
         <div className="bg-white rounded-lg shadow-sm border">
           <div className="p-6 border-b">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">最近的待办事项</h2>
-              <Link
-                to="/todos"
-                className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-              >
-                查看全部
-              </Link>
-            </div>
+            <h2 className="text-xl font-semibold text-gray-900">待办事项</h2>
           </div>
           
           <div className="p-6">
@@ -398,12 +339,6 @@ export default function Home() {
               <div className="text-center py-8">
                 <CheckSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-500">暂无待办事项</p>
-                <Link
-                  to="/todos"
-                  className="text-blue-600 hover:text-blue-700 text-sm font-medium mt-2 inline-block"
-                >
-                  创建第一个待办事项
-                </Link>
               </div>
             ) : (
               <div className="space-y-4">
@@ -445,6 +380,13 @@ export default function Home() {
                               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">属性</label>
+                          <AttributeSelector
+                            selectedAttributes={editAttributes}
+                            onAttributesChange={setEditAttributes}
+                          />
                         </div>
                         <div className="flex justify-end space-x-2">
                           <button
@@ -546,8 +488,90 @@ export default function Home() {
               </div>
             )}
           </div>
+          
+          {/* 创建新Todo按钮和表单 */}
+          <div className="p-6 border-t">
+            {!showCreateForm ? (
+              <button
+                onClick={() => setShowCreateForm(true)}
+                className="w-full flex items-center justify-center space-x-2 py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="h-5 w-5" />
+                <span>创建新待办事项</span>
+              </button>
+            ) : (
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  value={newTodo.title}
+                  onChange={(e) => setNewTodo(prev => ({ ...prev, title: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="待办事项标题"
+                  autoFocus
+                />
+                <textarea
+                  value={newTodo.description}
+                  onChange={(e) => setNewTodo(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="描述（可选）"
+                  rows={2}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">开始日期</label>
+                    <input
+                      type="date"
+                      value={newTodo.start_date}
+                      onChange={(e) => setNewTodo(prev => ({ ...prev, start_date: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">截止日期</label>
+                    <input
+                      type="date"
+                      value={newTodo.due_date}
+                      onChange={(e) => setNewTodo(prev => ({ ...prev, due_date: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">属性</label>
+                  <AttributeSelector
+                    selectedAttributes={newTodoAttributes}
+                    onAttributesChange={setNewTodoAttributes}
+                  />
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <button
+                    onClick={() => {
+                      setShowCreateForm(false)
+                      setNewTodo({ title: '', description: '', start_date: '', due_date: '' })
+                      setNewTodoAttributes([])
+                    }}
+                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={createTodo}
+                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    创建
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </main>
+      
+      {/* 属性管理弹窗 */}
+      <AttributesModal 
+        isOpen={showAttributesModal}
+        onClose={() => setShowAttributesModal(false)}
+      />
     </div>
   )
 }
