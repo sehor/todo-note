@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { CheckSquare, Plus, User, LogOut, Check, Edit2, Trash2, Clock, Calendar } from 'lucide-react'
-import { useAuth } from '../hooks/useAuth'
+import Navbar from '../components/Navbar'
+import { CheckSquare, Plus, Edit2, Trash2, Calendar, Clock, RotateCcw } from 'lucide-react'
+import { useAuthStore } from '../store/authStore'
 import { supabase } from '../lib/supabase'
 import { AttributeTag } from '../components/AttributeTag'
 import { AttributeSelector } from '../components/AttributeSelector'
@@ -12,7 +13,7 @@ import type { TodoWithAttributes, UpdateTodoInput, TodoAttribute } from '../type
  * 主页面组件，显示导航和统计概览
  */
 export default function Home() {
-  const { user, signOut } = useAuth()
+  const { user } = useAuthStore()
 
   const [todos, setTodos] = useState<TodoWithAttributes[]>([])
   const [todosLoading, setTodosLoading] = useState(true)
@@ -87,6 +88,11 @@ export default function Home() {
    * 删除Todo
    */
   const deleteTodo = async (id: string) => {
+    // 显示确认对话框
+    if (!window.confirm('确定要删除这个待办事项吗？此操作无法撤销。')) {
+      return
+    }
+    
     try {
       const { error } = await supabase
         .from('todos')
@@ -273,57 +279,11 @@ export default function Home() {
     }
   }, [user])
 
-  /**
-   * 处理登出
-   */
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-    } catch (error) {
-      console.error('登出失败:', error)
-    }
-  }
+
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 导航栏 */}
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-8">
-              <h1 className="text-xl font-bold text-gray-900">Todo & Notes</h1>
-              <div className="hidden md:flex space-x-6">
-                <Link 
-                  to="/" 
-                  className="text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  首页
-                </Link>
-                <Link 
-                  to="/notes" 
-                  className="text-gray-600 hover:text-gray-900 font-medium"
-                >
-                  笔记
-                </Link>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 text-gray-600">
-                <User className="h-4 w-4" />
-                <span className="text-sm">{user?.email}</span>
-              </div>
-              <button
-                onClick={handleSignOut}
-                className="flex items-center space-x-1 text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                <LogOut className="h-4 w-4" />
-                <span className="text-sm">登出</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* 主要内容 */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -466,7 +426,8 @@ export default function Home() {
                                style={{
                                  display: '-webkit-box',
                                  WebkitLineClamp: 2,
-                                 WebkitBoxOrient: 'vertical'
+                                 WebkitBoxOrient: 'vertical',
+                                 whiteSpace: 'pre-wrap'
                                }}>
                                  {todo.description}
                                </p>
@@ -514,13 +475,22 @@ export default function Home() {
           {/* 创建新Todo按钮和表单 */}
           <div className="p-6 border-t">
             {!showCreateForm ? (
-              <button
-                onClick={() => setShowCreateForm(true)}
-                className="w-full flex items-center justify-center space-x-2 py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="h-5 w-5" />
-                <span>创建新待办事项</span>
-              </button>
+              <div className="space-y-3">
+                <button
+                  onClick={() => setShowCreateForm(true)}
+                  className="w-full flex items-center justify-center space-x-2 py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="h-5 w-5" />
+                  <span>创建新待办事项</span>
+                </button>
+                <Link
+                  to="/recurring"
+                  className="w-full flex items-center justify-center space-x-2 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  <span>管理重复任务模板</span>
+                </Link>
+              </div>
             ) : (
               <div className="space-y-4">
                 <input

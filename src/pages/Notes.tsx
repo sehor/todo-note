@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { Plus, Edit2, Trash2, User, LogOut, Home, FileText } from 'lucide-react'
-import { useAuth } from '../hooks/useAuth'
+import { FileText, Plus, Edit2, Trash2 } from 'lucide-react'
+import Navbar from '../components/Navbar'
+import { useAuthStore } from '../store/authStore'
 import { supabase } from '../lib/supabase'
 import type { Note, CreateNoteInput, UpdateNoteInput } from '../types'
 
@@ -9,7 +9,7 @@ import type { Note, CreateNoteInput, UpdateNoteInput } from '../types'
  * Notes 管理页面组件
  */
 export default function Notes() {
-  const { user, signOut } = useAuth()
+  const { user } = useAuthStore()
   const [notes, setNotes] = useState<Note[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -132,16 +132,7 @@ export default function Notes() {
     setEditNote({ title: '', content: '' })
   }
 
-  /**
-   * 处理登出
-   */
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-    } catch (error) {
-      console.error('登出失败:', error)
-    }
-  }
+
 
   /**
    * 截取内容预览
@@ -159,46 +150,7 @@ export default function Notes() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 导航栏 */}
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-8">
-              <h1 className="text-xl font-bold text-gray-900">Todo & Notes</h1>
-              <div className="hidden md:flex space-x-6">
-                <Link 
-                  to="/" 
-                  className="text-gray-600 hover:text-gray-900 font-medium flex items-center space-x-1"
-                >
-                  <Home className="h-4 w-4" />
-                  <span>首页</span>
-                </Link>
-                <Link 
-                  to="/notes" 
-                  className="text-blue-600 hover:text-blue-700 font-medium flex items-center space-x-1"
-                >
-                  <FileText className="h-4 w-4" />
-                  <span>笔记</span>
-                </Link>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 text-gray-600">
-                <User className="h-4 w-4" />
-                <span className="text-sm">{user?.email}</span>
-              </div>
-              <button
-                onClick={handleSignOut}
-                className="flex items-center space-x-1 text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                <LogOut className="h-4 w-4" />
-                <span className="text-sm">登出</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* 主要内容 */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import Home from './pages/Home'
 import Notes from './pages/Notes'
+import RecurringTodos from './pages/RecurringTodos'
 
 /**
  * 主应用组件，配置路由系统
@@ -48,6 +49,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Notes />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/recurring" 
+          element={
+            <ProtectedRoute>
+              <RecurringTodos />
             </ProtectedRoute>
           } 
         />

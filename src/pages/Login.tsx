@@ -79,7 +79,7 @@ export default function Login() {
             {isLogin ? '欢迎回来' : '创建账户'}
           </h1>
           <p className="text-gray-600">
-            {isLogin ? '登录到您的 Todo & Notes 管理器' : '开始管理您的待办事项和笔记'}
+            {isLogin ? '登录到您的 Todos 管理器' : '开始管理您的待办事项和笔记'}
           </p>
         </div>
 

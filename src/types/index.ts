@@ -197,3 +197,106 @@ export const DEFAULT_ATTRIBUTES = [
   { name: '工作', color: '#3B82F6' },
   { name: '个人', color: '#8B5CF6' },
 ] as const
+
+/**
+ * 重复任务频率类型
+ */
+export type RecurringFrequency = 'daily' | 'weekly'
+
+/**
+ * 重复任务模板类型定义
+ */
+export interface RecurringTemplate {
+  id: string
+  title: string
+  description: string | null
+  frequency: RecurringFrequency
+  interval_value: number // 间隔值：每N天或每N周
+  weekdays: number[] | null // 每周重复的天数，仅当frequency='weekly'时使用，0=周日，1=周一...6=周六
+  start_time: string | null // 每天的计划开始时间
+  end_date: string | null // 重复结束日期，NULL表示永不结束
+  enabled: boolean
+  last_generated_date: string | null // 上次生成实例的日期
+  user_id: string
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * 创建重复任务模板时的输入类型
+ */
+export interface CreateRecurringTemplateInput {
+  title: string
+  description?: string | null
+  frequency: RecurringFrequency
+  interval_value: number
+  weekdays?: number[] | null
+  start_time?: string | null
+  end_date?: string | null
+  enabled?: boolean
+  user_id: string
+}
+
+/**
+ * 更新重复任务模板时的输入类型
+ */
+export interface UpdateRecurringTemplateInput {
+  title?: string
+  description?: string | null
+  frequency?: RecurringFrequency
+  interval_value?: number
+  weekdays?: number[] | null
+  start_time?: string | null
+  end_date?: string | null
+  enabled?: boolean
+  last_generated_date?: string | null
+}
+
+/**
+ * 重复任务模板属性分配关系类型
+ */
+export interface RecurringTemplateAttributeAssignment {
+  id: string
+  template_id: string
+  attribute_id: string
+  created_at: string
+}
+
+/**
+ * 创建重复任务模板属性分配时的输入类型
+ */
+export interface CreateRecurringTemplateAttributeAssignmentInput {
+  template_id: string
+  attribute_id: string
+}
+
+/**
+ * 带有属性的重复任务模板类型（扩展原有模板类型）
+ */
+export interface RecurringTemplateWithAttributes extends RecurringTemplate {
+  todo_recurring_attribute_assignments?: {
+    todo_attributes: TodoAttribute
+  }[]
+  attributes?: TodoAttribute[] // 便于使用的扁平化属性数组
+}
+
+/**
+ * 周几的显示名称映射
+ */
+export const WEEKDAY_NAMES = {
+  0: '周日',
+  1: '周一',
+  2: '周二',
+  3: '周三',
+  4: '周四',
+  5: '周五',
+  6: '周六',
+} as const
+
+/**
+ * 重复频率的显示名称映射
+ */
+export const FREQUENCY_NAMES = {
+  daily: '每天',
+  weekly: '每周',
+} as const
