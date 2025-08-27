@@ -17,8 +17,8 @@ export default function Todos() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [newTodo, setNewTodo] = useState({ title: '', description: '' })
-  const [editTodo, setEditTodo] = useState({ title: '', description: '' })
+  const [newTodo, setNewTodo] = useState({ title: '', description: '', start_date: '', due_date: '' })
+  const [editTodo, setEditTodo] = useState({ title: '', description: '', start_date: '', due_date: '' })
   const [newTodoAttributes, setNewTodoAttributes] = useState<string[]>([])
   const [editTodoAttributes, setEditTodoAttributes] = useState<string[]>([])
   const [showFilter, setShowFilter] = useState(false)
@@ -67,6 +67,8 @@ export default function Todos() {
       const todoData: CreateTodoInput = {
         title: newTodo.title.trim(),
         description: newTodo.description.trim() || null,
+        start_date: newTodo.start_date || null,
+        due_date: newTodo.due_date || null,
         user_id: user!.id
       }
       
@@ -92,7 +94,7 @@ export default function Todos() {
         if (assignmentError) throw assignmentError
       }
       
-      setNewTodo({ title: '', description: '' })
+      setNewTodo({ title: '', description: '', start_date: '', due_date: '' })
       setNewTodoAttributes([])
       setCreating(false)
       fetchTodos()
@@ -149,7 +151,12 @@ export default function Todos() {
    */
   const startEdit = (todo: TodoWithAttributes) => {
     setEditingId(todo.id)
-    setEditTodo({ title: todo.title, description: todo.description || '' })
+    setEditTodo({ 
+      title: todo.title, 
+      description: todo.description || '',
+      start_date: todo.start_date || '',
+      due_date: todo.due_date || ''
+    })
     setEditTodoAttributes(todo.attributes?.map(attr => attr.id) || [])
   }
 
@@ -163,7 +170,9 @@ export default function Todos() {
       // 更新todo基本信息
       await updateTodo(editingId, {
         title: editTodo.title.trim(),
-        description: editTodo.description.trim() || null
+        description: editTodo.description.trim() || null,
+        start_date: editTodo.start_date || null,
+        due_date: editTodo.due_date || null
       })
       
       // 删除现有属性分配
@@ -189,7 +198,7 @@ export default function Todos() {
       }
       
       setEditingId(null)
-      setEditTodo({ title: '', description: '' })
+      setEditTodo({ title: '', description: '', start_date: '', due_date: '' })
       setEditTodoAttributes([])
       fetchTodos()
     } catch (error) {
@@ -202,7 +211,7 @@ export default function Todos() {
    */
   const cancelEdit = () => {
     setEditingId(null)
-    setEditTodo({ title: '', description: '' })
+    setEditTodo({ title: '', description: '', start_date: '', due_date: '' })
     setEditTodoAttributes([])
   }
 
@@ -347,6 +356,30 @@ export default function Todos() {
                   rows={3}
                 />
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    开始时间
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={newTodo.start_date}
+                    onChange={(e) => setNewTodo({ ...newTodo, start_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    到期时间
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={newTodo.due_date}
+                    onChange={(e) => setNewTodo({ ...newTodo, due_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   属性标签
@@ -372,7 +405,7 @@ export default function Todos() {
                 <button
                   onClick={() => {
                     setCreating(false)
-                    setNewTodo({ title: '', description: '' })
+                    setNewTodo({ title: '', description: '', start_date: '', due_date: '' })
                   }}
                   className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-md transition-colors flex items-center space-x-2"
                 >
@@ -451,6 +484,30 @@ export default function Todos() {
                         rows={3}
                       />
                     </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          开始时间
+                        </label>
+                        <input
+                          type="datetime-local"
+                          value={editTodo.start_date}
+                          onChange={(e) => setEditTodo({ ...editTodo, start_date: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          到期时间
+                        </label>
+                        <input
+                          type="datetime-local"
+                          value={editTodo.due_date}
+                          onChange={(e) => setEditTodo({ ...editTodo, due_date: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         属性标签
@@ -520,9 +577,26 @@ export default function Todos() {
                             ))}
                           </div>
                         )}
-                        <p className="text-xs text-gray-400 mt-2">
-                          创建于 {new Date(todo.created_at).toLocaleString('zh-CN')}
-                        </p>
+                        <div className="text-xs text-gray-500 mt-2 space-y-1">
+                          {todo.start_date && (
+                            <p>
+                              开始时间: {new Date(todo.start_date).toLocaleString('zh-CN')}
+                            </p>
+                          )}
+                          {todo.due_date && (
+                            <p className={`${
+                              new Date(todo.due_date) < new Date() && !todo.completed
+                                ? 'text-red-500 font-medium'
+                                : ''
+                            }`}>
+                              到期时间: {new Date(todo.due_date).toLocaleString('zh-CN')}
+                              {new Date(todo.due_date) < new Date() && !todo.completed && ' (已过期)'}
+                            </p>
+                          )}
+                          <p className="text-gray-400">
+                            创建于 {new Date(todo.created_at).toLocaleString('zh-CN')}
+                          </p>
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2 ml-4">
