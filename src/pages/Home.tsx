@@ -304,15 +304,15 @@ export default function Home() {
 
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       <Navbar />
 
       {/* 主要内容 */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 待办事项列表 */}
-        <div className="bg-white rounded-lg shadow-sm border">
-          <div className="p-6 border-b">
-            <h2 className="text-xl font-semibold text-gray-900">待办事项</h2>
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20">
+          <div className="p-6 border-b border-gray-100/50 bg-gradient-to-r from-blue-600/5 to-indigo-600/5">
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">待办事项</h2>
           </div>
           
           <div className="p-6">
@@ -321,14 +321,17 @@ export default function Home() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
               </div>
             ) : todos.length === 0 ? (
-              <div className="text-center py-8">
-                <CheckSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">暂无待办事项</p>
+              <div className="text-center py-12">
+                <div className="bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
+                  <CheckSquare className="h-10 w-10 text-blue-500" />
+                </div>
+                <p className="text-gray-600 text-lg font-medium">暂无待办事项</p>
+                <p className="text-gray-400 text-sm mt-2">点击下方按钮创建您的第一个待办事项</p>
               </div>
             ) : (
               <div className="space-y-4">
                 {todos.map((todo) => (
-                  <div key={todo.id} className="border rounded-lg p-4">
+                  <div key={todo.id} className="group bg-gradient-to-r from-white to-gray-50/50 border border-gray-200/60 rounded-xl p-6 hover:shadow-lg hover:border-blue-200/60 transition-all duration-300 hover:-translate-y-1">
                     {editingId === todo.id ? (
                       // 编辑模式
                       <div className="space-y-4">
@@ -336,13 +339,13 @@ export default function Home() {
                           type="text"
                           value={editTodo.title}
                           onChange={(e) => setEditTodo(prev => ({ ...prev, title: e.target.value }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/80 backdrop-blur-sm transition-all duration-200"
                           placeholder="待办事项标题"
                         />
                         <textarea
                           value={editTodo.description}
                           onChange={(e) => setEditTodo(prev => ({ ...prev, description: e.target.value }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/80 backdrop-blur-sm transition-all duration-200 resize-none"
                           placeholder="描述（可选）"
                           rows={2}
                         />
@@ -353,13 +356,13 @@ export default function Home() {
                               type="date"
                               value={editTodo.start_date}
                               onChange={(e) => setEditTodo(prev => ({ ...prev, start_date: e.target.value }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/80 backdrop-blur-sm transition-all duration-200"
                             />
                             <input
                               type="time"
                               value={editTodo.start_time}
                               onChange={(e) => setEditTodo(prev => ({ ...prev, start_time: e.target.value }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/80 backdrop-blur-sm transition-all duration-200 mt-2"
                             />
                           </div>
                           <div>
@@ -368,13 +371,13 @@ export default function Home() {
                               type="date"
                               value={editTodo.due_date}
                               onChange={(e) => setEditTodo(prev => ({ ...prev, due_date: e.target.value }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/80 backdrop-blur-sm transition-all duration-200"
                             />
                             <input
                               type="time"
                               value={editTodo.due_time}
                               onChange={(e) => setEditTodo(prev => ({ ...prev, due_time: e.target.value }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/80 backdrop-blur-sm transition-all duration-200 mt-2"
                             />
                           </div>
                         </div>
@@ -390,13 +393,13 @@ export default function Home() {
                         <div className="flex justify-end space-x-2">
                           <button
                             onClick={cancelEdit}
-                            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+                            className="px-6 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all duration-200"
                           >
                             取消
                           </button>
                           <button
                             onClick={saveEdit}
-                            className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                            className="px-6 py-2 text-sm bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl"
                           >
                             保存
                           </button>
@@ -407,20 +410,32 @@ export default function Home() {
                       <div className="relative h-32 w-full">
                         {/* 右上方：时间信息 */}
                         <div className="absolute top-0 right-0 text-xs text-gray-500 space-y-1">
-                          <div className="flex items-center space-x-1 justify-end">
-                            <Calendar className="h-3 w-3" />
-                            <span>开始: {new Date(Number(todo.start_date)).toLocaleDateString()}</span>
+                          <div className="flex items-center space-x-1 justify-end bg-blue-50/80 px-2 py-1 rounded-lg">
+                            <Calendar className="h-3 w-3 text-blue-500" />
+                            <span className="text-blue-600 font-medium">开始: {new Date(Number(todo.start_date)).toLocaleDateString()}</span>
                           </div>
                           {/* 只有未完成的todo才显示剩余时间 */}
                           {!todo.completed && (
-                            <div className="flex items-center space-x-1 justify-end">
-                              <Clock className="h-3 w-3" />
-                              <span className={`${
+                            <div className={`flex items-center space-x-1 justify-end px-2 py-1 rounded-lg ${
+                              calculateTimeRemaining(todo.due_date).includes('已逾期') 
+                                ? 'bg-red-50/80' 
+                                : calculateTimeRemaining(todo.due_date) === '无限期'
+                                ? 'bg-indigo-50/80'
+                                : 'bg-green-50/80'
+                            }`}>
+                              <Clock className={`h-3 w-3 ${
                                 calculateTimeRemaining(todo.due_date).includes('已逾期') 
                                   ? 'text-red-500' 
                                   : calculateTimeRemaining(todo.due_date) === '无限期'
-                                  ? 'text-blue-500'
-                                  : 'text-gray-500'
+                                  ? 'text-indigo-500'
+                                  : 'text-green-500'
+                              }`} />
+                              <span className={`font-medium ${
+                                calculateTimeRemaining(todo.due_date).includes('已逾期') 
+                                  ? 'text-red-600' 
+                                  : calculateTimeRemaining(todo.due_date) === '无限期'
+                                  ? 'text-indigo-600'
+                                  : 'text-green-600'
                               }`}>
                                 {calculateTimeRemaining(todo.due_date)}
                               </span>
@@ -474,12 +489,12 @@ export default function Home() {
                           {/* 完成状态开关 */}
                           <button
                             onClick={() => toggleComplete(todo.id, todo.completed)}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                              todo.completed ? 'bg-green-500' : 'bg-gray-200'
+                            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-lg hover:shadow-xl ${
+                              todo.completed ? 'bg-gradient-to-r from-green-500 to-emerald-500' : 'bg-gradient-to-r from-gray-200 to-gray-300'
                             }`}
                           >
                             <span
-                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              className={`inline-block h-5 w-5 transform rounded-full bg-white transition-all duration-300 shadow-md ${
                                 todo.completed ? 'translate-x-6' : 'translate-x-1'
                               }`}
                             />
@@ -487,13 +502,13 @@ export default function Home() {
                           
                           <button
                             onClick={() => startEdit(todo)}
-                            className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 group-hover:opacity-100 opacity-70"
                           >
                             <Edit2 className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => deleteTodo(todo.id)}
-                            className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 group-hover:opacity-100 opacity-70"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -507,19 +522,19 @@ export default function Home() {
           </div>
           
           {/* 创建新Todo按钮和表单 */}
-          <div className="p-6 border-t">
+          <div className="p-6 border-t border-gray-100/50 bg-gradient-to-r from-gray-50/30 to-blue-50/30">
             {!showCreateForm ? (
               <div className="space-y-3">
                 <button
                   onClick={() => setShowCreateForm(true)}
-                  className="w-full flex items-center justify-center space-x-2 py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="w-full flex items-center justify-center space-x-2 py-4 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-1 font-medium"
                 >
                   <Plus className="h-5 w-5" />
                   <span>创建新待办事项</span>
                 </button>
                 <Link
                   to="/recurring"
-                  className="w-full flex items-center justify-center space-x-2 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="w-full flex items-center justify-center space-x-2 py-3 px-6 border border-gray-200 text-gray-700 rounded-xl hover:bg-white hover:border-blue-200 hover:text-blue-600 transition-all duration-300 shadow-sm hover:shadow-md bg-white/60 backdrop-blur-sm"
                 >
                   <RotateCcw className="h-4 w-4" />
                   <span>管理重复任务模板</span>
@@ -531,14 +546,14 @@ export default function Home() {
                   type="text"
                   value={newTodo.title}
                   onChange={(e) => setNewTodo(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/80 backdrop-blur-sm transition-all duration-200"
                   placeholder="待办事项标题"
                   autoFocus
                 />
                 <textarea
                   value={newTodo.description}
                   onChange={(e) => setNewTodo(prev => ({ ...prev, description: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/80 backdrop-blur-sm transition-all duration-200 resize-none"
                   placeholder="描述（可选）"
                   rows={2}
                 />
@@ -549,13 +564,13 @@ export default function Home() {
                       type="date"
                       value={newTodo.start_date}
                       onChange={(e) => setNewTodo(prev => ({ ...prev, start_date: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/80 backdrop-blur-sm transition-all duration-200"
                     />
                     <input
                       type="time"
                       value={newTodo.start_time}
                       onChange={(e) => setNewTodo(prev => ({ ...prev, start_time: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/80 backdrop-blur-sm transition-all duration-200 mt-2"
                     />
                   </div>
                   <div>
@@ -564,13 +579,13 @@ export default function Home() {
                       type="date"
                       value={newTodo.due_date}
                       onChange={(e) => setNewTodo(prev => ({ ...prev, due_date: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/80 backdrop-blur-sm transition-all duration-200"
                     />
                     <input
                       type="time"
                       value={newTodo.due_time}
                       onChange={(e) => setNewTodo(prev => ({ ...prev, due_time: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/80 backdrop-blur-sm transition-all duration-200 mt-2"
                     />
                   </div>
                 </div>
@@ -590,13 +605,13 @@ export default function Home() {
                       setNewTodo({ title: '', description: '', start_date: '', start_time: '', due_date: '', due_time: '' })
                       setNewTodoAttributes([])
                     }}
-                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+                    className="px-6 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all duration-200"
                   >
                     取消
                   </button>
                   <button
                     onClick={createTodo}
-                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                    className="px-6 py-2 text-sm bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl"
                   >
                     创建
                   </button>
