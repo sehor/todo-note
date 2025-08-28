@@ -6,8 +6,8 @@ export interface Todo {
   title: string
   description: string | null
   completed: boolean
-  start_date: string | null // 计划执行时间，可空表示无特定开始时间
-  due_date: string | null // 到期时间，可空表示永远不会到期
+  start_date: string // 计划执行时间，毫秒数，NOT NULL
+  due_date: string | null // 到期时间，毫秒数，null表示无截止时间
   user_id: string
   created_at: string
   updated_at: string
@@ -19,8 +19,8 @@ export interface Todo {
 export interface CreateTodoInput {
   title: string
   description?: string | null
-  start_date?: string | null // 计划执行时间，可空表示无特定开始时间
-  due_date?: string | null // 到期时间，可空表示永远不会到期
+  start_date?: string // 计划执行时间，毫秒数，可选，默认当前时间
+  due_date?: string | null // 到期时间，毫秒数，可选，默认null（无截止时间）
   user_id: string
 }
 
@@ -31,8 +31,8 @@ export interface UpdateTodoInput {
   title?: string
   description?: string | null
   completed?: boolean
-  start_date?: string | null // 计划执行时间，可空表示无特定开始时间
-  due_date?: string | null // 到期时间，可空表示永远不会到期
+  start_date?: string // 计划执行时间，毫秒数
+  due_date?: string | null // 到期时间，毫秒数，null表示无截止时间
 }
 
 /**

@@ -8,6 +8,7 @@ import { AttributeTag } from '../components/AttributeTag'
 import { AttributeSelector } from '../components/AttributeSelector'
 import { AttributesModal } from '../components/AttributesModal'
 import type { TodoWithAttributes, UpdateTodoInput, TodoAttribute } from '../types'
+import { msToDateString, processDateInput, calculateTimeRemaining as utilCalculateTimeRemaining, isNoDeadline } from '../utils/timeUtils'
 
 /**
  * 主页面组件，显示导航和统计概览
@@ -18,10 +19,10 @@ export default function Home() {
   const [todos, setTodos] = useState<TodoWithAttributes[]>([])
   const [todosLoading, setTodosLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editTodo, setEditTodo] = useState({ title: '', description: '', start_date: '', due_date: '' })
+  const [editTodo, setEditTodo] = useState({ title: '', description: '', start_date: '', start_time: '', due_date: '', due_time: '' })
   const [editAttributes, setEditAttributes] = useState<TodoAttribute[]>([])
   const [showCreateForm, setShowCreateForm] = useState(false)
-  const [newTodo, setNewTodo] = useState({ title: '', description: '', start_date: '', due_date: '' })
+  const [newTodo, setNewTodo] = useState({ title: '', description: '', start_date: '', start_time: '', due_date: '', due_time: '' })
   const [newTodoAttributes, setNewTodoAttributes] = useState<TodoAttribute[]>([])
   const [showAttributesModal, setShowAttributesModal] = useState(false)
   const [attributesRefreshTrigger, setAttributesRefreshTrigger] = useState(0)
@@ -45,9 +46,11 @@ export default function Home() {
       
       if (error) throw error
       
-      // 转换数据格式
+      // 转换数据格式，正确处理null值
       const todosWithAttributes: TodoWithAttributes[] = (data || []).map(todo => ({
         ...todo,
+        start_date: todo.start_date?.toString() || '',
+        due_date: todo.due_date ? todo.due_date.toString() : null,
         attributes: todo.todo_attribute_assignments?.map((assignment: any) => assignment.todo_attributes) || []
       }))
       
@@ -111,11 +114,39 @@ export default function Home() {
   }
 
   /**
-   * 将ISO格式日期转换为HTML date输入框所需的yyyy-MM-dd格式
+   * 将毫秒数格式化为 yyyy-MM-dd
    */
-  const formatDateForInput = (isoDate: string | null): string => {
-    if (!isoDate) return ''
-    return isoDate.split('T')[0]
+  const formatDateForInput = (ms: string | null): string => {
+    if (ms === null || ms === undefined || ms === '') return '' // null值表示无截止时间，不显示
+    return msToDateString(ms)
+  }
+
+  /**
+   * 将毫秒数格式化为 HH:mm
+   */
+  const formatTimeForInput = (ms: string | null): string => {
+    if (ms === null || ms === undefined || ms === '') return ''
+    const date = new Date(Number(ms))
+    const hours = date.getHours().toString().padStart(2, '0')
+    const minutes = date.getMinutes().toString().padStart(2, '0')
+    return `${hours}:${minutes}`
+  }
+
+  /**
+   * 合并日期和时间为毫秒数
+   */
+  const combineDateAndTime = (dateStr: string, timeStr: string): string | null => {
+    if (!dateStr) return null
+    
+    const date = new Date(dateStr)
+    if (timeStr) {
+      const [hours, minutes] = timeStr.split(':').map(Number)
+      date.setHours(hours, minutes, 0, 0)
+    } else {
+      date.setHours(0, 0, 0, 0)
+    }
+    
+    return date.getTime().toString()
   }
 
   /**
@@ -127,7 +158,9 @@ export default function Home() {
       title: todo.title,
       description: todo.description || '',
       start_date: formatDateForInput(todo.start_date),
-      due_date: formatDateForInput(todo.due_date)
+      start_time: formatTimeForInput(todo.start_date),
+      due_date: formatDateForInput(todo.due_date),
+      due_time: formatTimeForInput(todo.due_date)
     })
     setEditAttributes(todo.attributes || [])
   }
@@ -137,7 +170,7 @@ export default function Home() {
    */
   const cancelEdit = () => {
     setEditingId(null)
-    setEditTodo({ title: '', description: '', start_date: '', due_date: '' })
+    setEditTodo({ title: '', description: '', start_date: '', start_time: '', due_date: '', due_time: '' })
     setEditAttributes([])
   }
 
@@ -151,10 +184,10 @@ export default function Home() {
       const updateData: UpdateTodoInput = {
         title: editTodo.title.trim(),
         description: editTodo.description.trim() || null,
-        start_date: editTodo.start_date || null,
-        due_date: editTodo.due_date || null
+        start_date: combineDateAndTime(editTodo.start_date, editTodo.start_time) || new Date().getTime().toString(),
+        due_date: combineDateAndTime(editTodo.due_date, editTodo.due_time)
       }
-      
+
       // 更新todo基本信息
       const { error: updateError } = await supabase
         .from('todos')
@@ -204,8 +237,8 @@ export default function Home() {
       const todoData = {
         title: newTodo.title.trim(),
         description: newTodo.description.trim() || null,
-        start_date: newTodo.start_date || null,
-        due_date: newTodo.due_date || null,
+        start_date: combineDateAndTime(newTodo.start_date, newTodo.start_time) || new Date().getTime().toString(),
+        due_date: combineDateAndTime(newTodo.due_date, newTodo.due_time),
         user_id: user?.id,
         completed: false
       }
@@ -237,7 +270,7 @@ export default function Home() {
       fetchTodos()
       
       // 重置表单
-      setNewTodo({ title: '', description: '', start_date: '', due_date: '' })
+      setNewTodo({ title: '', description: '', start_date: '', start_time: '', due_date: '', due_time: '' })
       setNewTodoAttributes([])
       setShowCreateForm(false)
     } catch (error) {
@@ -248,29 +281,8 @@ export default function Home() {
   /**
    * 计算剩余时间
    */
-  const calculateTimeRemaining = (dueDate: string | null): string => {
-    if (!dueDate) return '无截止时间'
-    
-    const now = new Date()
-    const due = new Date(dueDate)
-    const diffMs = due.getTime() - now.getTime()
-    
-    if (diffMs < 0) {
-      const overdueDays = Math.floor(Math.abs(diffMs) / (1000 * 60 * 60 * 24))
-      return `已逾期 ${overdueDays} 天`
-    }
-    
-    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-    const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-    
-    if (days > 0) {
-      return `剩余 ${days} 天 ${hours} 小时`
-    } else if (hours > 0) {
-      return `剩余 ${hours} 小时`
-    } else {
-      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
-      return `剩余 ${minutes} 分钟`
-    }
+  const calculateTimeRemaining = (dueDate: string): string => {
+    return utilCalculateTimeRemaining(dueDate)
   }
 
   useEffect(() => {
@@ -278,6 +290,16 @@ export default function Home() {
       fetchTodos()
     }
   }, [user])
+
+  // 添加定时器来动态更新剩余时间显示
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // 强制重新渲染组件以更新剩余时间显示
+      setTodos(prevTodos => [...prevTodos])
+    }, 60000) // 每分钟更新一次
+
+    return () => clearInterval(interval)
+  }, [])
 
 
 
@@ -333,6 +355,12 @@ export default function Home() {
                               onChange={(e) => setEditTodo(prev => ({ ...prev, start_date: e.target.value }))}
                               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
+                            <input
+                              type="time"
+                              value={editTodo.start_time}
+                              onChange={(e) => setEditTodo(prev => ({ ...prev, start_time: e.target.value }))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
+                            />
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">截止日期</label>
@@ -341,6 +369,12 @@ export default function Home() {
                               value={editTodo.due_date}
                               onChange={(e) => setEditTodo(prev => ({ ...prev, due_date: e.target.value }))}
                               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <input
+                              type="time"
+                              value={editTodo.due_time}
+                              onChange={(e) => setEditTodo(prev => ({ ...prev, due_time: e.target.value }))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
                             />
                           </div>
                         </div>
@@ -373,19 +407,19 @@ export default function Home() {
                       <div className="relative h-32 w-full">
                         {/* 右上方：时间信息 */}
                         <div className="absolute top-0 right-0 text-xs text-gray-500 space-y-1">
-                          {todo.start_date && (
-                            <div className="flex items-center space-x-1 justify-end">
-                              <Calendar className="h-3 w-3" />
-                              <span>开始: {new Date(todo.start_date).toLocaleDateString()}</span>
-                            </div>
-                          )}
+                          <div className="flex items-center space-x-1 justify-end">
+                            <Calendar className="h-3 w-3" />
+                            <span>开始: {new Date(Number(todo.start_date)).toLocaleDateString()}</span>
+                          </div>
                           {/* 只有未完成的todo才显示剩余时间 */}
-                          {todo.due_date && !todo.completed && (
+                          {!todo.completed && (
                             <div className="flex items-center space-x-1 justify-end">
                               <Clock className="h-3 w-3" />
                               <span className={`${
                                 calculateTimeRemaining(todo.due_date).includes('已逾期') 
                                   ? 'text-red-500' 
+                                  : calculateTimeRemaining(todo.due_date) === '无限期'
+                                  ? 'text-blue-500'
                                   : 'text-gray-500'
                               }`}>
                                 {calculateTimeRemaining(todo.due_date)}
@@ -517,6 +551,12 @@ export default function Home() {
                       onChange={(e) => setNewTodo(prev => ({ ...prev, start_date: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
+                    <input
+                      type="time"
+                      value={newTodo.start_time}
+                      onChange={(e) => setNewTodo(prev => ({ ...prev, start_time: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">截止日期</label>
@@ -525,6 +565,12 @@ export default function Home() {
                       value={newTodo.due_date}
                       onChange={(e) => setNewTodo(prev => ({ ...prev, due_date: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      type="time"
+                      value={newTodo.due_time}
+                      onChange={(e) => setNewTodo(prev => ({ ...prev, due_time: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
                     />
                   </div>
                 </div>
@@ -541,7 +587,7 @@ export default function Home() {
                   <button
                     onClick={() => {
                       setShowCreateForm(false)
-                      setNewTodo({ title: '', description: '', start_date: '', due_date: '' })
+                      setNewTodo({ title: '', description: '', start_date: '', start_time: '', due_date: '', due_time: '' })
                       setNewTodoAttributes([])
                     }}
                     className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"

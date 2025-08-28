@@ -14,6 +14,7 @@ import {
   TodoAttribute
 } from '../types'
 import RecurringTemplateForm from '../components/RecurringTemplateForm'
+import { getCurrentTimeMs, getMaxTimeMs } from '../utils/timeUtils'
 
 /**
  * 重复任务管理页面
@@ -25,6 +26,137 @@ const RecurringTodos: React.FC = () => {
   const [showForm, setShowForm] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<RecurringTemplateWithAttributes | null>(null)
   const [attributes, setAttributes] = useState<TodoAttribute[]>([])
+  const [generating, setGenerating] = useState(false) // 添加这行
+
+  /**
+   * 检查今天是否应该生成重复任务
+   */
+  const checkShouldGenerateToday = (template: RecurringTemplateWithAttributes, today: Date): boolean => {
+    const dayOfWeek = today.getDay() // 0=周日, 1=周一, ..., 6=周六
+    
+    if (template.frequency === 'daily') {
+      return true // 每日任务总是生成
+    } else if (template.frequency === 'weekly' && template.weekdays) {
+      return template.weekdays.includes(dayOfWeek)
+    }
+    
+    return false
+  }
+
+  /**
+   * 手动生成重复任务
+   * 根据模板生成今日的待办事项
+   */
+  const handleManualGenerate = async () => {
+    setGenerating(true)
+    try {
+      let totalGenerated = 0
+      const today = new Date()
+      today.setHours(0, 0, 0, 0) // 设置为当天的开始
+      const todayStartMs = today.getTime()
+
+      // 获取所有启用的模板
+      const enabledTemplates = templates.filter(t => t.enabled)
+
+      for (const template of enabledTemplates) {
+        // 检查今天是否应该生成任务
+        const shouldGenerate = checkShouldGenerateToday(template, new Date())
+
+        if (!shouldGenerate) continue
+
+        // 检查今天是否已经为这个模板生成了待办事项
+        // 查询今天范围内的任务（从今天00:00到23:59）
+        const todayEndMs = new Date(todayStartMs + 24 * 60 * 60 * 1000 - 1).getTime()
+        const { data: existingTodos, error: existingTodosError } = await supabase
+          .from('todos')
+          .select('id')
+          .eq('recurring_template_id', template.id)
+          .gte('start_date', todayStartMs.toString())
+          .lte('start_date', todayEndMs.toString())
+
+        if (existingTodos && existingTodos.length > 0) {
+          continue // 今天已经生成过，跳过
+        }
+
+        // 创建新的待办事项
+        const todoData = {
+          title: template.title,
+          description: template.description,
+          start_date: (() => {
+            if (!template.start_time) {
+              return todayStartMs.toString() // 无时间时使用今天开始
+            }
+            // template.start_time 可以是 'HH:mm:ss' 或 'HH:mm'
+            // 也可能包含时区信息，例如 'HH:mm:ss+ZZ:ZZ'
+            const timeParts = template.start_time.split('+')[0].split(':');
+            const hours = parseInt(timeParts[0], 10) || 0;
+            const minutes = parseInt(timeParts[1], 10) || 0;
+            const seconds = timeParts.length > 2 ? parseInt(timeParts[2], 10) : 0;
+
+            const startDateTime = new Date(todayStartMs)
+            startDateTime.setHours(hours, minutes, seconds, 0)
+
+            return startDateTime.getTime().toString() // 使用字符串避免精度损失
+          })(),
+          due_date: (() => {
+            if (!template.start_time) {
+              return getMaxTimeMs() // 无时间时使用最大值（无截止时间）
+            }
+            // 截止时间设置为开始时间的当天结束（23:59:59）
+            const timeParts = template.start_time.split('+')[0].split(':');
+            const hours = parseInt(timeParts[0], 10) || 0;
+            const minutes = parseInt(timeParts[1], 10) || 0;
+            const seconds = timeParts.length > 2 ? parseInt(timeParts[2], 10) : 0;
+
+            const dueDateTime = new Date(todayStartMs)
+            dueDateTime.setHours(23, 59, 59, 999) // 设置为当天结束
+
+            return dueDateTime.getTime().toString() // 使用字符串避免精度损失
+          })(),
+          recurring_template_id: template.id,
+          user_id: template.user_id,
+          completed: false
+        }
+
+        const { data: newTodo, error: todoError } = await supabase
+          .from('todos')
+          .insert(todoData)
+          .select('id')
+          .single()
+        
+        if (todoError) {
+          console.error('创建待办事项失败:', todoError)
+          continue
+        }
+        
+        // 复制属性关联
+        if (template.attributes && template.attributes.length > 0) {
+          const attributeAssignments = template.attributes.map(attr => ({
+            todo_id: newTodo.id,
+            attribute_id: attr.id
+          }))
+          
+          await supabase
+            .from('todo_attribute_assignments')
+            .insert(attributeAssignments)
+        }
+        
+        totalGenerated++
+      }
+      
+      if (totalGenerated > 0) {
+        alert(`成功生成 ${totalGenerated} 个重复任务`)
+      } else {
+        alert('今天没有需要生成的重复任务')
+      }
+      
+    } catch (error) {
+      console.error('生成重复任务失败:', error)
+      alert('生成失败，请重试')
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   /**
    * 获取重复任务模板列表
@@ -193,13 +325,28 @@ const RecurringTodos: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">重复任务管理</h1>
           <p className="text-gray-600 mt-1">创建和管理周期性重复的任务模板</p>
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          新建模板
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleManualGenerate}
+            disabled={generating}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+              generating
+                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+            title="手动调用后端生成今日的重复事项"
+          >
+            <RotateCcw className="w-4 h-4" />
+            {generating ? '生成中...' : '手动生成今日事项'}
+          </button>
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            新建模板
+          </button>
+        </div>
       </div>
 
       {templates.length === 0 ? (
@@ -279,11 +426,7 @@ const RecurringTodos: React.FC = () => {
                     </div>
                   )}
                   
-                  {template.last_generated_date && (
-                    <p className="text-xs text-gray-400 mt-2">
-                      上次生成: {new Date(template.last_generated_date).toLocaleDateString()}
-                    </p>
-                  )}
+
                 </div>
                 
                 <div className="flex items-center gap-2 ml-4">
