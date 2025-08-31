@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
-import { CheckSquare, Plus, Edit2, Trash2, Calendar, Clock, RotateCcw } from 'lucide-react'
+import { CheckSquare, Plus, Edit2, Trash2, Calendar, Clock, RotateCcw, Eye, EyeOff } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { supabase } from '../lib/supabase'
 import { AttributeTag } from '../components/AttributeTag'
@@ -26,6 +26,7 @@ export default function Home() {
   const [newTodoAttributes, setNewTodoAttributes] = useState<TodoAttribute[]>([])
   const [showAttributesModal, setShowAttributesModal] = useState(false)
   const [attributesRefreshTrigger, setAttributesRefreshTrigger] = useState(0)
+  const [showCompleted, setShowCompleted] = useState(true)
 
   /**
    * 获取Todo列表
@@ -301,6 +302,35 @@ export default function Home() {
     return () => clearInterval(interval)
   }, [])
 
+  /**
+   * 获取排序后的todos列表
+   */
+  const getSortedAndFilteredTodos = () => {
+    let filteredTodos = showCompleted ? todos : todos.filter(todo => !todo.completed)
+    
+    // 按剩余时间排序：最紧急的在前
+    return filteredTodos.sort((a, b) => {
+      // 已完成的排在最后
+      if (a.completed && !b.completed) return 1
+      if (!a.completed && b.completed) return -1
+      
+      // 对于未完成的事项，按剩余时间排序
+      if (!a.completed && !b.completed) {
+        // 无截止时间的排在最后
+        if (!a.due_date && b.due_date) return 1
+        if (a.due_date && !b.due_date) return -1
+        if (!a.due_date && !b.due_date) return 0
+        
+        // 都有截止时间，按时间排序
+        const aDueTime = Number(a.due_date)
+        const bDueTime = Number(b.due_date)
+        return aDueTime - bDueTime
+      }
+      
+      return 0
+    })
+  }
+
 
 
   return (
@@ -312,7 +342,25 @@ export default function Home() {
         {/* 待办事项列表 */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20">
           <div className="p-6 border-b border-gray-100/50 bg-gradient-to-r from-blue-600/5 to-indigo-600/5">
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">待办事项</h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">待办事项</h2>
+              <button
+                onClick={() => setShowCompleted(!showCompleted)}
+                className="flex items-center space-x-2 px-4 py-2 bg-white/60 hover:bg-white/80 border border-gray-200/60 rounded-lg transition-all duration-200 text-sm font-medium text-gray-700 hover:text-blue-600"
+              >
+                {showCompleted ? (
+                  <>
+                    <EyeOff className="h-4 w-4" />
+                    <span>隐藏已完成</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="h-4 w-4" />
+                    <span>显示已完成</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
           
           <div className="p-6">
@@ -320,17 +368,27 @@ export default function Home() {
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
               </div>
-            ) : todos.length === 0 ? (
+            ) : getSortedAndFilteredTodos().length === 0 ? (
               <div className="text-center py-12">
                 <div className="bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
                   <CheckSquare className="h-10 w-10 text-blue-500" />
                 </div>
-                <p className="text-gray-600 text-lg font-medium">暂无待办事项</p>
-                <p className="text-gray-400 text-sm mt-2">点击下方按钮创建您的第一个待办事项</p>
+                <p className="text-gray-600 text-lg font-medium">
+                  {!showCompleted && todos.some(todo => todo.completed) 
+                    ? '暂无未完成的待办事项' 
+                    : '暂无待办事项'
+                  }
+                </p>
+                <p className="text-gray-400 text-sm mt-2">
+                  {!showCompleted && todos.some(todo => todo.completed)
+                    ? '所有待办事项都已完成！点击"显示已完成"查看或创建新的待办事项'
+                    : '点击下方按钮创建您的第一个待办事项'
+                  }
+                </p>
               </div>
             ) : (
               <div className="space-y-4">
-                {todos.map((todo) => (
+                {getSortedAndFilteredTodos().map((todo) => (
                   <div key={todo.id} className="group bg-gradient-to-r from-white to-gray-50/50 border border-gray-200/60 rounded-xl p-6 hover:shadow-lg hover:border-blue-200/60 transition-all duration-300 hover:-translate-y-1">
                     {editingId === todo.id ? (
                       // 编辑模式
